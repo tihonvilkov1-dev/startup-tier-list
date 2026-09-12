@@ -126,7 +126,10 @@ npm run check:github
    `https://<имя-сервиса>.onrender.com/auth/github/callback`
    Точный адрес Render печатает в логе запуска (строка `Callback URL для GitHub OAuth App`).
    Если поле принимает только один адрес — на время демо замените существующий, локальный вернёте потом.
-5. Через 2–3 минуты сервис поднимется: открывайте `https://<имя-сервиса>.onrender.com` и отправляйте ссылку коллегам.
+5. **Проверьте настройки на самом хостинге** (без входа): откройте `https://<имя-сервиса>.onrender.com/auth/status`.
+   В ответе `clientId` и `callbackUrl` — это ровно то, что сервер отправляет в GitHub. Значение `callbackUrl`
+   должно посимвольно совпадать со строкой в «Authorization callback URL» OAuth App.
+6. Через 2–3 минуты сервис поднимется: открывайте `https://<имя-сервиса>.onrender.com` и отправляйте ссылку коллегам.
 
 Что нужно знать про бесплатный план:
 - сервис засыпает после ~15 минут простоя, первый заход занимает 30–60 секунд;
@@ -185,6 +188,7 @@ startup-tier-list-fullstack/
 |---|---|---|
 | GET | `/auth/github` | редирект на GitHub для входа |
 | GET | `/auth/github/callback` | принимает `code`, создаёт сессию |
+| GET | `/auth/status` | самодиагностика без входа: какой `client_id` и какой callback реально использует сервер (секреты не показывает) |
 | POST | `/auth/logout` | выход (удаляет сессию) |
 | GET | `/api/me` | текущий пользователь (401, если не вошёл) |
 | GET | `/api/companies` | список стартапов и тиры |
@@ -209,7 +213,9 @@ startup-tier-list-fullstack/
 | Симптом | Причина и решение |
 |---|---|
 | `redirect_uri_mismatch` | **Authorization callback URL** в OAuth App не совпадает с `GITHUB_CALLBACK_URL`. Нужно ровно `http://localhost:3000/auth/github/callback`. |
-| `incorrect_client_credentials` | Неверный `GITHUB_CLIENT_SECRET`. Сгенерируйте новый («Generate a new client secret») и обновите `.env`. После правки `.env` сервер нужно перезапустить. |
+| `incorrect_client_credentials` | Неверный `GITHUB_CLIENT_SECRET`. Сгенерируйте новый («Generate a new client secret») и обновите `.env` (или переменную окружения на хостинге). После правки `.env` сервер нужно перезапустить. |
+| GitHub отдаёт **404** при нажатии «Войти через GitHub» | GitHub не знает такой `client_id`. Почти всегда это значит, что в переменных окружения хостинга осталось старое/чужое значение. Проверьте: откройте `https://<ваш-сервис>/auth/status` и сравните поле `clientId` с настройками OAuth App. Ещё вариант: приложение создано как GitHub App, а не OAuth App. |
+| `redirect_uri_mismatch` | Значение `callbackUrl` из `/auth/status` должно **посимвольно** совпадать со строкой в «Authorization callback URL» OAuth App. Типичная ошибка — указать `https://onrender.com` (это сайт Render) вместо `https://<имя-сервиса>.onrender.com`. |
 | «GitHub не признал client_id (ответ 404)» | GitHub не знает такой `client_id`. Скопируйте его заново из настроек OAuth App (кнопкой Copy, не перепечатывая руками) и проверьте, что создано именно **OAuth App**, а не GitHub App. Проверить: `npm run check:github`. |
 | `Не хватает переменных окружения: ...` | Нет `.env` или значения пустые. Смотрите шаг 3. |
 | `Порт 3000 уже занят` | Закройте прошлый запуск или смените `PORT` в `.env` **и** callback URL в OAuth App. |

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import express from "express";
-import { config } from "./config.js";
+import { config, missingConfig, configWarnings } from "./config.js";
 import { upsertUser } from "./db.js";
 
 /**
@@ -17,6 +17,18 @@ import { upsertUser } from "./db.js";
 export const authRouter = express.Router();
 const SCOPE = "read:user";
 
+/** Собирает ссылку на страницу согласия GitHub (используется и в редиректе, и в диагностике). */
+function buildAuthorizeUrl(state) {
+  const params = new URLSearchParams({
+    client_id: config.github.clientId,
+    redirect_uri: config.github.callbackUrl,
+    scope: SCOPE,
+    state,
+    allow_signup: "true"
+  });
+  return `${config.github.oauthBaseUrl}/authorize?${params.toString()}`;
+}
+
 /** Сравнение строк без утечки по времени. */
 function safeEqual(a, b) {
   const bufA = Buffer.from(String(a));
@@ -25,19 +37,36 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+/**
+ * Самодиагностика настроек: открывается без входа, чтобы можно было проверить
+ * конфигурацию прямо на хостинге. Секреты не раскрываются — только факт, что они заданы.
+ * Откройте https://<ваш-сервис>/auth/status
+ */
+authRouter.get("/status", (req, res) => {
+  res.set("cache-control", "no-store");
+  res.json({
+    ok: missingConfig().length === 0,
+    missing: missingConfig(),
+    nodeEnv: config.nodeEnv,
+    clientId: config.github.clientId,
+    callbackUrl: config.github.callbackUrl,
+    // именно эту ссылку сервер отдаёт браузеру при нажатии «Войти через GitHub»
+    authorizeUrlExample: buildAuthorizeUrl("ПРИМЕР_STATE"),
+    detectedPublicUrl: config.publicUrl || null,
+    renderExternalUrl: process.env.RENDER_EXTERNAL_URL || null,
+    secretsConfigured: {
+      clientSecret: config.github.clientSecret.length > 0,
+      sessionSecret: config.sessionSecret.length > 0
+    },
+    warnings: configWarnings(),
+    hint: "callbackUrl должен посимвольно совпадать с Authorization callback URL в настройках OAuth App"
+  });
+});
+
 authRouter.get("/github", (req, res) => {
   const state = crypto.randomBytes(16).toString("hex");
   req.session.oauthState = state;
-
-  const params = new URLSearchParams({
-    client_id: config.github.clientId,
-    redirect_uri: config.github.callbackUrl,
-    scope: SCOPE,
-    state,
-    allow_signup: "true"
-  });
-
-  res.redirect(`${config.github.oauthBaseUrl}/authorize?${params.toString()}`);
+  res.redirect(buildAuthorizeUrl(state));
 });
 
 authRouter.get("/github/callback", async (req, res) => {

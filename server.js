@@ -101,6 +101,8 @@ const server = app.listen(config.port, "0.0.0.0", () => {
   if (config.publicUrl) console.log(`  Локально:            http://localhost:${config.port}`);
   console.log(`  Callback URL для GitHub OAuth App:`);
   console.log(`  ${config.github.callbackUrl}`);
+  console.log(`  client_id: ${config.github.clientId || "(не задан!)"}`);
+  console.log(`  Проверка настроек на хостинге: ${(config.publicUrl || "http://localhost:" + config.port)}/auth/status`);
   console.log(`  Данные: ${path.resolve(config.dataFile)}`);
   console.log(`  Режим:  ${config.nodeEnv}`);
   console.log("  ------------------------------------------------");
