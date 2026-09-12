@@ -130,12 +130,96 @@ async function probeGithubCredentials() {
   return lastProbe.result;
 }
 
+/** Экранирование для мини-страницы диагностики. */
+function esc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * Человекочитаемая версия диагностики — открывается в браузере по /auth/status.
+ * Показывает ровно то, что сервер отправляет в GitHub, и даёт кликабельные проверки.
+ */
+function renderStatusPage(p) {
+  const probe = p.githubProbe;
+  const probeOk = probe && probe.verdict === "credentials_ok";
+  const probeUnknown = probe && probe.verdict === "client_id_unknown";
+
+  const probeText = typeof probe === "string"
+    ? esc(probe)
+    : (probe ? `${esc(probe.verdict)} — ${esc(probe.explanation)} (HTTP ${probe.httpStatus}, ответ GitHub: ${esc(probe.githubError || "нет")})` : "");
+
+  const issues = list => list.length
+    ? `<ul class="bad">${list.map(i => `<li>${esc(i)}</li>`).join("")}</ul>`
+    : `<p class="ok">замечаний нет</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диагностика авторизации</title>
+<style>
+  body{background:#1a1a1a;color:#f4f4f4;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;padding:22px}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px}
+  .muted{color:#a3a3a3;font-size:13px}
+  .card{background:#222;border:1px solid #363636;border-radius:14px;padding:16px;margin:14px 0}
+  .row{margin:0 0 6px}
+  code{background:#2b2b2b;border-radius:6px;padding:2px 6px;word-break:break-all;font-size:13px}
+  .bad{color:#f0a89c;margin:6px 0 0 18px;padding:0}
+  .ok{color:#a3d977;margin:6px 0 0}
+  .big{font-size:17px;font-weight:700;padding:12px 14px;border-radius:12px;margin:0 0 10px}
+  .big.ok{background:#22331f;color:#a3d977;border:1px solid #38552f}
+  .big.bad{background:#33211f;color:#f0a89c;border:1px solid #5a3a3a}
+  a.btn{display:inline-block;background:#e8664f;color:#1a1a1a;font-weight:700;text-decoration:none;padding:10px 14px;border-radius:10px;margin:6px 6px 0 0}
+  a.alt{background:#2c2c2c;color:#f4f4f4;border:1px solid #3d3d3d}
+  h2{font-size:15px;margin:0 0 8px;color:#d7d7d7}
+</style></head>
+<body><div class="wrap">
+  <h1>Диагностика входа через GitHub</h1>
+  <p class="muted">Эта страница показывает, что именно ваш сервер отправляет в GitHub. Секреты не раскрываются.</p>
+
+  <div class="card">
+    <div class="big ${probeOk ? "ok" : (probeUnknown || probe === undefined ? "bad" : "bad")}">
+      ${probeOk
+        ? "Ключи верные — GitHub знает приложение и принял client_id с секретом"
+        : (probeUnknown
+          ? "GitHub не знает такой client_id — это и даёт 404 при входе"
+          : "Проверка ещё не выполнена или ключи не подходят")}
+    </div>
+    ${probeText ? `<div class="row">${probeText}</div>` : ""}
+    <a class="btn" href="/auth/status?probe=1">Проверить ключи на GitHub</a>
+    <a class="btn alt" href="/auth/status?probe=1&amp;format=json">Показать как JSON</a>
+  </div>
+
+  <div class="card">
+    <h2>Client ID, который использует сервер</h2>
+    <div class="row"><code>${esc(p.clientId) || "(пусто)"}</code> — длина ${esc((p.clientId || "").length)}</div>
+    ${issues(p.clientIdIssues)}
+  </div>
+
+  <div class="card">
+    <h2>Callback URL — это должно посимвольно совпадать с настройками приложения на GitHub</h2>
+    <div class="row"><code>${esc(p.callbackUrl)}</code></div>
+    ${issues(p.callbackUrlIssues)}
+    <a class="btn alt" href="${esc(p.authorizeUrlExample)}">Открыть эту ссылку авторизации в GitHub</a>
+  </div>
+
+  <div class="card">
+    <h2>Прочее</h2>
+    <div class="row">Режим: <code>${esc(p.nodeEnv)}</code></div>
+    <div class="row">Адрес, который прислал хостинг: <code>${esc(p.detectedPublicUrl || "—")}</code></div>
+    <div class="row">Секреты заданы: client_secret — ${p.secretsConfigured.clientSecret ? "да" : "нет"}, session_secret — ${p.secretsConfigured.sessionSecret ? "да" : "нет"}</div>
+    ${p.warnings.length ? `<ul class="bad">${p.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+  </div>
+</div></body></html>`;
+}
+
 /**
  * Самодиагностика настроек: открывается без входа, чтобы можно было проверить
  * конфигурацию прямо на хостинге. Секреты не раскрываются — только факт, что они заданы.
  *
- *   GET /auth/status          — что сервер отправляет в GitHub
+ *   GET /auth/status          — что сервер отправляет в GitHub (в браузере — страница)
  *   GET /auth/status?probe=1  — плюс живая проверка ключей на стороне GitHub
+ *   GET /auth/status?format=json — всегда JSON
  */
 authRouter.get("/status", async (req, res) => {
   res.set("cache-control", "no-store");
@@ -162,10 +246,13 @@ authRouter.get("/status", async (req, res) => {
 
   if (req.query.probe) {
     payload.githubProbe = await probeGithubCredentials();
-  } else {
-    payload.githubProbe = "добавьте ?probe=1, чтобы проверить ключи живым запросом к GitHub";
   }
 
+  const wantsHtml = !req.query.format && (req.get("accept") || "").includes("text/html");
+  if (wantsHtml) {
+    res.type("html").send(renderStatusPage(payload));
+    return;
+  }
   res.json(payload);
 });
 
