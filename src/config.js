@@ -17,6 +17,46 @@ export const isProd = (process.env.NODE_ENV || "development") === "production";
 // (скопировали две строки — и всё сломается). Поэтому обрезаем их сразу.
 const trimmed = value => String(value == null ? "" : value).trim();
 
+/**
+ * Встроенный Client ID приложения.
+ *
+ * Это НЕ секрет: client_id публичный, он виден в каждой ссылке авторизации в браузере
+ * (секрет по-прежнему живёт только в переменных окружения и в git не попадает).
+ * Нужен как страховка от копипаста в панели хостинга: там легко получить «0» вместо «O»,
+ * и тогда GitHub отвечает 404 на клик по кнопке входа.
+ */
+const BUILT_IN_CLIENT_ID = "Ov23liezpWDPaOCxFGuc";
+
+/** Отличается ли значение от встроенного только символами, которые легко спутать (0/O, 1/l/I)? */
+function looksLikeTypoOfBuiltIn(candidate) {
+  if (candidate.length !== BUILT_IN_CLIENT_ID.length) return false;
+  let differences = 0;
+  for (let i = 0; i < candidate.length; i++) {
+    const a = candidate[i];
+    const b = BUILT_IN_CLIENT_ID[i];
+    if (a === b) continue;
+    const confusable =
+      ("0Oo".includes(a) && "0Oo".includes(b)) ||
+      ("1lI".includes(a) && "1lI".includes(b));
+    if (!confusable) return false;      // отличие не в похожих символах — значит это другое приложение
+    if (++differences > 4) return false;
+  }
+  return differences > 0;
+}
+
+function resolveClientId() {
+  const fromEnv = trimmed(process.env.GITHUB_CLIENT_ID);
+  if (!fromEnv) return { value: BUILT_IN_CLIENT_ID, source: "built-in" };
+  if (looksLikeTypoOfBuiltIn(fromEnv)) {
+    console.warn(`[config] GITHUB_CLIENT_ID из переменных окружения ("${fromEnv}") отличается от встроенного ` +
+      `только символами 0/O — использую встроенное значение ${BUILT_IN_CLIENT_ID}`);
+    return { value: BUILT_IN_CLIENT_ID, source: "built-in (исправлена опечатка 0/O)" };
+  }
+  return { value: fromEnv, source: "env" };
+}
+
+const clientIdResolved = resolveClientId();
+
 // Внешний адрес приложения нужен, чтобы собрать правильный callback для GitHub.
 // Render сам подставляет RENDER_EXTERNAL_URL; на других хостингах задайте PUBLIC_URL.
 const publicUrl = trimmed(process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL).replace(/\/+$/, "");
@@ -35,7 +75,8 @@ export const config = {
   dataFile: trimmed(process.env.DATA_FILE) || "./data/db.json",
 
   github: {
-    clientId: trimmed(process.env.GITHUB_CLIENT_ID),
+    clientId: clientIdResolved.value,
+    clientIdSource: clientIdResolved.source,
     clientSecret: trimmed(process.env.GITHUB_CLIENT_SECRET),
     // Приоритет: явный GITHUB_CALLBACK_URL -> PUBLIC_URL/RENDER_EXTERNAL_URL -> localhost.
     // Адрес должен совпадать с "Authorization callback URL" в настройках OAuth App.

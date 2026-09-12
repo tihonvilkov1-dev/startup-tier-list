@@ -193,6 +193,7 @@ function renderStatusPage(p) {
   <div class="card">
     <h2>Client ID, который использует сервер</h2>
     <div class="row"><code>${esc(p.clientId) || "(пусто)"}</code> — длина ${esc((p.clientId || "").length)}</div>
+    <div class="row muted">Источник значения: <code>${esc(p.clientIdSource || "—")}</code></div>
     ${issues(p.clientIdIssues)}
   </div>
 
@@ -229,6 +230,7 @@ authRouter.get("/status", async (req, res) => {
     missing: missingConfig(),
     nodeEnv: config.nodeEnv,
     clientId: config.github.clientId,
+    clientIdSource: config.github.clientIdSource,
     clientIdIssues: sanityOfClientId(config.github.clientId),
     callbackUrl: config.github.callbackUrl,
     callbackUrlIssues: sanityOfCallback(config.github.callbackUrl),
@@ -276,7 +278,8 @@ authRouter.get("/github/callback", async (req, res) => {
     if (req.query.error) return fail(`GitHub отклонил вход: ${req.query.error}`);
     if (!code) return fail("GitHub не вернул код авторизации");
     if (!expected || !state || !safeEqual(state, expected)) {
-      return fail("Проверка state не пройдена — попробуйте войти ещё раз");
+      return fail("Ссылка авторизации устарела или была открыта вручную, а не по кнопке. " +
+        "Нажмите «Войти через GitHub» ещё раз — всё должно сработать.");
     }
 
     // 1) Меняем временный code на access_token
