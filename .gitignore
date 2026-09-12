@@ -1,0 +1,12 @@
+# зависимости
+node_modules/
+
+# секреты и данные пользователей — не коммитим
+.env
+data/db.json
+data/*.tmp
+
+# мусор
+.DS_Store
+npm-debug.log*
+*.log

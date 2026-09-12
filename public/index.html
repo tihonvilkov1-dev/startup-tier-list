@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тир-лист стартапов</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ==================== Шапка ==================== -->
+    <header class="topbar">
+      <h1>Тир-лист стартапов</h1>
+      <div class="topbar-right" id="userBox" hidden>
+        <img class="avatar" id="userAvatar" alt="" width="32" height="32">
+        <span class="user-nick" id="userNick">—</span>
+        <span class="save-state" id="saveState"></span>
+        <button type="button" id="btnLogout" title="Выйти из аккаунта">Выйти</button>
+      </div>
+    </header>
+
+    <!-- ==================== Загрузка ==================== -->
+    <section id="loadingView">
+      <p class="muted centered">Загружаю…</p>
+    </section>
+
+    <!-- ==================== Экран входа ==================== -->
+    <section id="loginView" hidden>
+      <div class="panel">
+        <h2>Вход через GitHub</h2>
+        <p>
+          Тир-лист сохраняется на сервере и привязан к вашему GitHub-аккаунту. Можно закрыть
+          вкладку, обновить страницу или зайти с другого устройства — прогресс останется на месте.
+        </p>
+        <a class="btn-github" href="/auth/github">
+          <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          Войти через GitHub
+        </a>
+        <p class="hint error" id="authError" hidden></p>
+        <p class="hint">Запрашиваем только публичный профиль (scope <code>read:user</code>). Пароль GitHub приложение не видит.</p>
+      </div>
+    </section>
+
+    <!-- ==================== Игровой экран ==================== -->
+    <section id="gameView" hidden>
+      <!-- 7 полос-тиров: цветная плашка слева + тёмная зона под чипы справа -->
+      <div class="tierlist" id="tierList"></div>
+
+      <div class="progress">
+        <div class="progress-text" id="progressText"></div>
+        <div class="bar"><i id="progressBar"></i></div>
+      </div>
+
+      <div class="card-area" id="cardArea">
+        <!-- Текущая компания: показываем ровно одну -->
+        <div class="card" id="card" draggable="true">
+          <div class="card-name" id="cardName">—</div>
+          <div class="card-sector" id="cardSector"></div>
+          <div class="card-desc" id="cardDesc"></div>
+          <div class="grip" id="grip" title="Потяните карточку в нужную зону">
+            <span class="dots">⠿</span> Тяни карточку в нужный тир
+          </div>
+          <div class="card-hint">
+            Перетащи карточку в цветную зону или нажми букву тира.
+            Горячие клавиши: S A B C D E F (или 1–7), Ctrl+Z — отмена, Esc — закрыть меню.
+          </div>
+        </div>
+        <div class="tier-buttons" id="tierButtons"></div>
+      </div>
+
+      <div class="done" id="doneBox" hidden>
+        <h2>Готово! Вот твой тир-лист</h2>
+        <p class="hint" id="doneHint"></p>
+        <div class="controls centered-controls">
+          <button type="button" class="btn-primary" id="btnRestart">Начать заново</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button type="button" id="btnSkip">Пропустить</button>
+        <button type="button" id="btnUndo">Отменить последнее</button>
+        <button type="button" class="btn-danger" id="btnReset">Сбросить всё</button>
+        <span class="flash" id="flash" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Меню по клику на чип -->
+  <div class="popover" id="chipMenu" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
