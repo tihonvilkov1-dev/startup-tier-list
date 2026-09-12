@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { config, missingConfig, configWarnings } from "./config.js";
 import { upsertUser } from "./db.js";
+import { companies } from "./data/companies.js";
 
 /**
  * Настоящий OAuth 2.0 flow GitHub, написанный руками на встроенном fetch —
@@ -207,6 +208,7 @@ function renderStatusPage(p) {
   <div class="card">
     <h2>Прочее</h2>
     <div class="row">Режим: <code>${esc(p.nodeEnv)}</code></div>
+    <div class="row">Компаний в списке: <code>${esc(p.companiesCount)}</code></div>
     <div class="row">Адрес, который прислал хостинг: <code>${esc(p.detectedPublicUrl || "—")}</code></div>
     <div class="row">Секреты заданы: client_secret — ${p.secretsConfigured.clientSecret ? "да" : "нет"}, session_secret — ${p.secretsConfigured.sessionSecret ? "да" : "нет"}</div>
     ${p.warnings.length ? `<ul class="bad">${p.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
@@ -229,6 +231,7 @@ authRouter.get("/status", async (req, res) => {
     ok: missingConfig().length === 0,
     missing: missingConfig(),
     nodeEnv: config.nodeEnv,
+    companiesCount: companies.length,
     clientId: config.github.clientId,
     clientIdSource: config.github.clientIdSource,
     clientIdIssues: sanityOfClientId(config.github.clientId),
