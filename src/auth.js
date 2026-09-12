@@ -101,14 +101,16 @@ async function probeGithubCredentials() {
   const githubError = (data && data.error) || "";
   let verdict = "unexpected";
   if (networkError) verdict = "no_network";
-  else if (githubError === "invalid_grant") verdict = "credentials_ok";
+  else if (githubError === "invalid_grant" || githubError === "bad_verification_code") verdict = "credentials_ok";
   else if (githubError === "incorrect_client_credentials") verdict = "client_ok_secret_wrong";
   else if (status === 404 || githubError === "Not Found") verdict = "client_id_unknown";
+  else if (status === 200) verdict = "credentials_ok";   // приложение найдено, ошибка не про ключи
 
   const explanations = {
-    credentials_ok: "Ключи верные: GitHub знает это приложение, client_id и secret приняты.",
-    client_ok_secret_wrong: "Приложение найдено, но client_secret не подходит. Пересоздайте секрет в настройках OAuth App и обновите переменную на хостинге.",
-    client_id_unknown: "GitHub НЕ знает такой client_id: именно это даёт 404 при входе. Скопируйте Client ID заново из настроек OAuth App (кнопкой Copy) и обновите переменную GITHUB_CLIENT_ID на хостинге.",
+    credentials_ok: "Ключи верные: GitHub знает приложение и принял client_id с client_secret. " +
+      "Сообщение про код (bad_verification_code / invalid_grant) — это норма: мы специально послали несуществующий код.",
+    client_ok_secret_wrong: "Приложение найдено, но client_secret не подходит. Пересоздайте секрет в настройках приложения и обновите переменную на хостинге.",
+    client_id_unknown: "GitHub НЕ знает такой client_id: именно это даёт 404 при входе. Скопируйте Client ID заново из настроек приложения (кнопкой Copy) и обновите переменную GITHUB_CLIENT_ID на хостинге.",
     no_network: "Сервер приложения не смог обратиться к github.com (сеть/файрвол хостинга).",
     unexpected: "Ответ GitHub не распознан, смотрите поля httpStatus и githubError."
   };
