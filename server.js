@@ -37,7 +37,6 @@ app.disable("x-powered-by");
 
 // За прокси/HTTPS (например, при деплое) — чтобы cookie с secure работали
 if (isProd) app.set("trust proxy", 1);
-
 app.use(express.json({ limit: "256kb" }));
 
 app.use(session({
@@ -49,7 +48,7 @@ app.use(session({
   cookie: {
     httpOnly: true,          // cookie недоступна из JS — токен сессии не украсть через XSS
     sameSite: "lax",         // плюс проверка Origin ниже — этого хватает от CSRF
-    secure: isProd,          // в продакшене только по HTTPS
+    secure: config.cookieSecure,   // в продакшене HTTPS (переопределяется SESSION_COOKIE_SECURE)
     maxAge: 1000 * 60 * 60 * 24 * 30
   }
 }));
@@ -95,10 +94,11 @@ app.use((err, req, res, next) => {
 /* ---------------------------------------------------------------- *
  *  Запуск
  * ---------------------------------------------------------------- */
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, "0.0.0.0", () => {
   console.log("\n  Тир-лист стартапов запущен");
   console.log("  ------------------------------------------------");
-  console.log(`  Откройте в браузере:  http://localhost:${config.port}`);
+  console.log(`  Откройте в браузере:  ${config.publicUrl || "http://localhost:" + config.port}`);
+  if (config.publicUrl) console.log(`  Локально:            http://localhost:${config.port}`);
   console.log(`  Callback URL для GitHub OAuth App:`);
   console.log(`  ${config.github.callbackUrl}`);
   console.log(`  Данные: ${path.resolve(config.dataFile)}`);

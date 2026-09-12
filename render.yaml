@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: startup-tier-list
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci --omit=dev || npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render сам присылает RENDER_EXTERNAL_URL, поэтому callback для GitHub
+      # собирается автоматически: https://<имя-сервиса>.onrender.com/auth/github/callback
+      # (тот же адрес укажите в настройках OAuth App)
+      - key: SESSION_SECRET
+        generateValue: true
+      # Эти два значения Render спросит при создании сервиса
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false

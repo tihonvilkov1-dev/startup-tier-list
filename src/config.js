@@ -11,28 +11,40 @@ const toInt = (value, fallback) => {
 };
 
 const port = toInt(process.env.PORT, 3000);
+export const isProd = (process.env.NODE_ENV || "development") === "production";
+
+// Внешний адрес приложения нужен, чтобы собрать правильный callback для GitHub.
+// Render сам подставляет RENDER_EXTERNAL_URL; на других хостингах задайте PUBLIC_URL.
+const publicUrl = String(process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "").replace(/\/+$/, "");
 
 export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   port,
+  publicUrl,
   sessionSecret: process.env.SESSION_SECRET || "",
   cookieName: "tierlist.sid",
+  // secure-cookie: в продакшене по умолчанию только HTTPS,
+  // но можно переопределить (SESSION_COOKIE_SECURE=true|false), если у хостинга нет HTTPS.
+  cookieSecure: process.env.SESSION_COOKIE_SECURE
+    ? process.env.SESSION_COOKIE_SECURE === "true"
+    : isProd,
   dataFile: process.env.DATA_FILE || "./data/db.json",
 
   github: {
     clientId: process.env.GITHUB_CLIENT_ID || "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-    // По умолчанию callback собирается из PORT — если поменяете порт, адрес
-    // подстроится сам (и его же нужно указать в настройках OAuth App).
-    callbackUrl: process.env.GITHUB_CALLBACK_URL || `http://localhost:${port}/auth/github/callback`,
+    // Приоритет: явный GITHUB_CALLBACK_URL -> PUBLIC_URL/RENDER_EXTERNAL_URL -> localhost.
+    // Адрес должен совпадать с "Authorization callback URL" в настройках OAuth App.
+    callbackUrl: process.env.GITHUB_CALLBACK_URL ||
+      (publicUrl
+        ? `${publicUrl}/auth/github/callback`
+        : `http://localhost:${port}/auth/github/callback`),
     // Базы вынесены в переменные, чтобы можно было тестировать без реального GitHub
     // и подключать GitHub Enterprise. По умолчанию — обычный GitHub.
     oauthBaseUrl: (process.env.GITHUB_OAUTH_BASE_URL || "https://github.com/login/oauth").replace(/\/+$/, ""),
     apiBaseUrl: (process.env.GITHUB_API_BASE_URL || "https://api.github.com").replace(/\/+$/, "")
   }
 };
-
-export const isProd = config.nodeEnv === "production";
 
 /** Каких обязательных переменных не хватает — чтобы показать понятную ошибку вместо стектрейса. */
 export function missingConfig() {
@@ -65,6 +77,12 @@ export function configWarnings() {
   if (config.sessionSecret.length < 16 || /super_secret|change|secret_?123/i.test(config.sessionSecret)) {
     warnings.push("SESSION_SECRET простой. Для локальной игры сойдёт, но перед выкладкой в интернет " +
       "сгенерируйте случайный: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+  }
+
+  if (isProd && /localhost|127\.0\.0\.1/.test(config.github.callbackUrl)) {
+    warnings.push("NODE_ENV=production, но callback ведёт на localhost (" + config.github.callbackUrl + "). " +
+      "Задайте PUBLIC_URL (например, https://ваш-сервис.onrender.com) или GITHUB_CALLBACK_URL, " +
+      "иначе GitHub не пустит вход. Тот же адрес добавьте в настройки OAuth App.");
   }
 
   return warnings;
