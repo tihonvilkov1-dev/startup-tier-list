@@ -74,7 +74,13 @@ app.use("/auth", authRouter);
 app.use("/api", apiRouter);
 
 // Статика: index.html, styles.css, app.js
-app.use(express.static(publicDir, { index: "index.html", extensions: ["html"] }));
+// для html/js/css отдаём no-cache — иначе после деплоя браузер показывает старую версию
+app.use(express.static(publicDir, {
+  index: "index.html",
+  extensions: ["html"],
+  etag: true,
+  setHeaders: res => res.setHeader("cache-control", "no-cache")
+}));
 
 app.use((req, res) => {
   if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {
